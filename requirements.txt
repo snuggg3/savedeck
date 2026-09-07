@@ -1,0 +1,6 @@
+requests>=2.31
+keyring>=24
+watchdog>=3.0
+pystray>=0.19
+pillow>=10.0
+winotify>=1.1
