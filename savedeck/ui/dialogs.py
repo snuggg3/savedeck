@@ -14,9 +14,14 @@ from savedeck import library as lib
 from savedeck import theme as T
 
 
-def _row(parent, r: int, label: str) -> int:
+def _add_row(parent, r: int, label: str, widget, hint=None) -> int:
+    """Grid a label (col 0) + widget (col 1) [+ optional hint (col 2)] on the
+    same row. Returns the next free row."""
     ttk.Label(parent, text=label, style="Muted.TLabel").grid(
-        row=r, column=0, sticky="ne", padx=(0, 8), pady=3)
+        row=r, column=0, sticky="e", padx=(0, 8), pady=3)
+    widget.grid(row=r, column=1, sticky="we", pady=3)
+    if hint is not None:
+        hint.grid(row=r, column=2, padx=(6, 0), sticky="w")
     return r + 1
 
 
@@ -38,103 +43,95 @@ class GameDialog:
         self.app = app
         self.entry = entry
         self.saved = False
-        self.win = T.toplevel(parent, "SaveDeck - game")
+        self.win = T.toplevel(parent, "SaveDeck - add game" if is_new
+                              else "SaveDeck - edit game")
         frame = ttk.Frame(self.win, padding=14)
         frame.pack(fill="both", expand=True)
 
         # -- library section ------------------------------------------------
         lf = ttk.Labelframe(frame, text="LIBRARY", padding=10)
         lf.grid(row=0, column=0, sticky="ew")
-        r = _row(lf, 0, "Name")
+        lf.columnconfigure(0, minsize=110)
+        r = 0
         self.name = ttk.Entry(lf, width=44)
         self.name.insert(0, entry.get("name", ""))
-        self.name.grid(row=r, column=1, sticky="we", pady=3)
-        r = _row(lf, r, "Thumbnail URL")
+        r = _add_row(lf, r, "Name", self.name)
         self.thumb = ttk.Entry(lf, width=44)
         self.thumb.insert(0, entry.get("thumbnail") or "")
-        self.thumb.grid(row=r, column=1, sticky="we", pady=3)
-        r = _row(lf, r, "Launch target")
+        r = _add_row(lf, r, "Thumbnail URL", self.thumb)
         self.target = ttk.Entry(lf, width=44)
         self.target.insert(0, entry.get("launchTarget") or "")
-        self.target.grid(row=r, column=1, sticky="we", pady=3)
-        ttk.Label(lf, text="steam:// URL, protocol,\nexe path or command",
-                  style="Faint.TLabel", font=T.FONT_SMALL).grid(
-            row=r - 1, column=2, padx=6)
-        r = _row(lf, r, "Install path")
-        self.install = ttk.Entry(lf, width=36)
+        r = _add_row(
+            lf, r, "Launch target", self.target,
+            ttk.Label(lf, text="steam:// URL, protocol,\nexe path or command",
+                      style="Faint.TLabel", font=T.FONT_SMALL))
+        install_box = ttk.Frame(lf)
+        self.install = ttk.Entry(install_box, width=36)
         self.install.insert(0, entry.get("installPath") or "")
-        self.install.grid(row=r, column=1, sticky="we", pady=3)
-        ttk.Button(lf, text="...", width=3,
-                   command=self._browse_install).grid(row=r, column=2)
+        self.install.pack(side="left", fill="x", expand=True)
+        ttk.Button(install_box, text="...", width=3,
+                   command=self._browse_install).pack(side="left", padx=(6, 0))
+        r = _add_row(lf, r, "Install path", install_box)
         lf.columnconfigure(1, weight=1)
 
         # -- protection section ------------------------------------------------
         pf = ttk.Labelframe(frame, text="SAVE PROTECTION", padding=10)
         pf.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        pf.columnconfigure(0, minsize=110)
         settings = app.config.settings
         default_repo = settings.get("default_repo", "")
         game = app.config.get_game(entry.get("sp_id") or "")
 
-        r = _row(pf, 0, "Destination")
+        r = 0
         self.provider = tk.StringVar(
             value=(game.provider if game else settings.get("provider", "github")))
-        ttk.Combobox(pf, textvariable=self.provider, state="readonly",
-                     width=16, values=tuple(_provider_ids())).grid(
-            row=r, column=1, sticky="w", pady=3)
-        r = _row(pf, r, "Repository / folder")
+        r = _add_row(
+            pf, r, "Destination",
+            ttk.Combobox(pf, textvariable=self.provider, state="readonly",
+                         width=16, values=tuple(_provider_ids())))
         self.repo = ttk.Entry(pf, width=30)
         self.repo.insert(0, (game.repo if game else default_repo))
-        self.repo.grid(row=r, column=1, sticky="we", pady=3)
-        ttk.Label(pf, text="user/repo or folder", style="Faint.TLabel",
-                  font=T.FONT_SMALL).grid(row=r - 1, column=2, padx=6)
-
-        r = _row(pf, r, "Save locations")
+        r = _add_row(pf, r, "Repository / folder", self.repo,
+                     ttk.Label(pf, text="user/repo or folder",
+                               style="Faint.TLabel", font=T.FONT_SMALL))
         paths_box = ttk.Frame(pf)
-        paths_box.grid(row=r, column=1, columnspan=2, sticky="we", pady=3)
         self.paths = T.listbox(paths_box, height=4, width=42)
         self.paths.pack(side="left", fill="both", expand=True)
         pbtns = ttk.Frame(paths_box)
-        pbtns.pack(side="left", padx=(6, 0))
-        ttk.Button(pbtns, text="Suggest", width=9,
-                   command=self._suggest).pack(fill="x", pady=1)
-        ttk.Button(pbtns, text="Add...", width=9,
-                   command=self._add_path).pack(fill="x", pady=1)
-        ttk.Button(pbtns, text="Remove", width=9,
-                   command=self._remove_path).pack(fill="x", pady=1)
+        pbtns.pack(side="left", padx=(6, 0), fill="y")
+        for text, cmd in (("Suggest", self._suggest),
+                          ("Add...", self._add_path),
+                          ("Remove", self._remove_path)):
+            ttk.Button(pbtns, text=text, width=9,
+                       command=cmd).pack(fill="x", pady=1)
         for p in (game.paths if game else []):
             self.paths.insert("end", p)
-        r += 1
-
-        r = _row(pf, r, "Game executables")
+        r = _add_row(pf, r, "Save locations", paths_box)
         self.processes = ttk.Entry(pf, width=44)
         self.processes.insert(0, ", ".join(game.process_names) if game else "")
-        self.processes.grid(row=r, column=1, sticky="we", pady=3)
-        ttk.Label(pf, text="comma separated;\nenables post-play backup",
-                  style="Faint.TLabel", font=T.FONT_SMALL).grid(
-            row=r - 1, column=2, padx=6)
-        r = _row(pf, r, "Exclude patterns")
+        r = _add_row(
+            pf, r, "Game executables", self.processes,
+            ttk.Label(pf, text="comma separated;\nenables post-play backup",
+                      style="Faint.TLabel", font=T.FONT_SMALL))
         self.excludes = ttk.Entry(pf, width=44)
         self.excludes.insert(0, ", ".join(game.exclude_patterns) if game else "")
-        self.excludes.grid(row=r, column=1, sticky="we", pady=3)
-        r = _row(pf, r, "Backup interval")
-        row = ttk.Frame(pf)
-        row.grid(row=r, column=1, sticky="w", pady=3)
+        r = _add_row(pf, r, "Exclude patterns", self.excludes)
+        interval_row = ttk.Frame(pf)
         self.interval = tk.StringVar(
             value=str(game.interval_minutes if game else 60))
-        ttk.Spinbox(row, textvariable=self.interval, from_=0, to=10080,
+        ttk.Spinbox(interval_row, textvariable=self.interval, from_=0, to=10080,
                     width=7).pack(side="left")
-        ttk.Label(row, text="min (0 = watch only)", style="Faint.TLabel").pack(
-            side="left", padx=6)
-        r = _row(pf, r, "Version cap")
-        row = ttk.Frame(pf)
-        row.grid(row=r, column=1, sticky="w", pady=3)
+        ttk.Label(interval_row, text="min (0 = watch only)",
+                  style="Faint.TLabel").pack(side="left", padx=6)
+        r = _add_row(pf, r, "Backup interval", interval_row)
+        cap_row = ttk.Frame(pf)
         self.max_versions = tk.StringVar(
             value=str(game.max_versions if game else 0))
-        ttk.Spinbox(row, textvariable=self.max_versions, from_=0, to=200,
+        ttk.Spinbox(cap_row, textvariable=self.max_versions, from_=0, to=200,
                     width=7).pack(side="left")
-        ttk.Label(row, text="0 = keep all", style="Faint.TLabel").pack(
-            side="left", padx=6)
-        r += 1
+        ttk.Label(cap_row, text="0 = keep all",
+                  style="Faint.TLabel").pack(side="left", padx=6)
+        r = _add_row(pf, r, "Version cap", cap_row)
         self.skip_run = tk.BooleanVar(
             value=bool(game.skip_while_running) if game else False)
         ttk.Checkbutton(pf, text="Skip backups while the game is running",

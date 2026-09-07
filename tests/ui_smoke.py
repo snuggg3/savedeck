@@ -93,6 +93,25 @@ def settle():
                   f"{dlg.win.winfo_ismapped()}", flush=True)
         dlg.win.destroy()
         root.update()
+        # game dialog: label/widget row alignment regression check
+        gd = dialogs.GameDialog(root, app, lib.new_entry("Align Game"),
+                                is_new=True)
+        root.update()
+        import tkinter.ttk as ttk
+        aligned = True
+        for f in [w for w in gd.win.winfo_children()
+                  if isinstance(w, ttk.Labelframe)]:
+            pos = {}
+            for w in f.winfo_children():
+                gi = w.grid_info()
+                if gi:
+                    pos[(gi["row"], gi["column"])] = w
+            for (row, col) in pos:
+                if col == 0 and (row, 1) not in pos:
+                    aligned = False
+        result["dlg_aligned"] = aligned
+        gd.win.destroy()
+        root.update()
     except Exception as e:
         result["error"] = str(e)
     finally:
@@ -120,6 +139,9 @@ print(f"  [{'PASS' if result.get('main_centered') else 'FAIL'}] "
       f"main window centered on screen")
 print(f"  [{'PASS' if result.get('dlg_centered') else 'FAIL'}] "
       f"dialog centered over parent")
-ok = ok and result.get("main_centered") and result.get("dlg_centered")
+print(f"  [{'PASS' if result.get('dlg_aligned') else 'FAIL'}] "
+      f"game dialog labels aligned with widgets")
+ok = (ok and result.get("main_centered") and result.get("dlg_centered")
+      and result.get("dlg_aligned"))
 print("UI SMOKE TEST OK" if ok and result["tiles"] == 2 else "UI SMOKE TEST FAILED")
 sys.exit(0 if ok and result["tiles"] == 2 else 1)
