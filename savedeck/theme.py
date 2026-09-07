@@ -164,15 +164,52 @@ def enable_dark_title_bar(window) -> None:
         pass
 
 
+# -- window placement -----------------------------------------------------------
+def center_on_screen(window, width: int = None, height: int = None) -> None:
+    """Center a window on the screen (clamped to visible area)."""
+    window.update_idletasks()
+    sw, sh = window.winfo_screenwidth(), window.winfo_screenheight()
+    w = width or window.winfo_width()
+    h = height or window.winfo_height()
+    x = max(0, (sw - w) // 2)
+    y = max(0, (sh - h) // 2 - 20)  # slightly above center: looks better
+    window.geometry(f"+{x}+{y}")
+
+
+def center_over_parent(window) -> None:
+    """Center a dialog over its parent window (clamped to the screen)."""
+    window.update_idletasks()
+    try:
+        px, py = window.master.winfo_rootx(), window.master.winfo_rooty()
+        pw, ph = window.master.winfo_width(), window.master.winfo_height()
+        sw, sh = window.winfo_screenwidth(), window.winfo_screenheight()
+        w, h = window.winfo_width(), window.winfo_height()
+        x = max(0, px + (pw - w) // 2)
+        y = max(0, py + (ph - h) // 3)
+        x = min(x, sw - w) if sw > w else 0
+        y = min(y, sh - h - 40) if sh > h else 0
+        window.geometry(f"+{x}+{y}")
+    except tk.TclError:
+        center_on_screen(window)
+
+
 # -- factory helpers ----------------------------------------------------------
 def toplevel(parent, title: str, grab: bool = True,
              resizable=(True, True)) -> tk.Toplevel:
-    """A themed modal dialog window."""
+    """A themed modal dialog window, centered over its parent.
+
+    Centering happens twice: immediately (parent-relative) and again on
+    <Map>, when the dialog's final content size is known. The <Map> handler
+    never re-binds itself, so handler count stays bounded.
+    """
     t = tk.Toplevel(parent)
     t.configure(background=BG)
     t.title(title)
     t.transient(parent)
     enable_dark_title_bar(t)
+    center_over_parent(t)
+    t.bind("<Map>", lambda e: center_over_parent(t) if e.widget is t else None,
+           add="+")
     if grab:
         t.grab_set()
     t.resizable(*resizable)

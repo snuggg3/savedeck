@@ -32,6 +32,7 @@ root.title("SaveDeck v1.0.0 - game library + save protection")
 root.geometry("1220x800")
 print("step: theme.apply", flush=True)
 theme.apply(root)
+theme.center_on_screen(root, 1220, 800)  # mirror main.py
 print("step: SaveDeckApp", flush=True)
 app = SaveDeckApp(root, config, engine)
 print("step: app built", flush=True)
@@ -68,6 +69,30 @@ def settle():
         app.toggle_hidden(app.lib["games"][0])  # restore
         root.update_idletasks()
         result["hidden"] = (after_hide, hidden_view, pw_btn_visible)
+        # window centering checks
+        from savedeck.ui import dialogs
+        sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
+        cx, cy = (sw - 1220) // 2, max(0, (sh - 800) // 2 - 20)
+        result["main_centered"] = (abs(root.winfo_x() - cx) <= 2 and
+                                   abs(root.winfo_y() - cy) <= 2)
+        if os.environ.get("SD_DEBUG"):
+            print(f"    debug: main x={root.winfo_x()} y={root.winfo_y()} "
+                  f"w={root.winfo_width()} h={root.winfo_height()} "
+                  f"screen={sw}x{sh} expected=({cx},{cy})", flush=True)
+        dlg = dialogs.PasswordSetDialog(root)
+        root.update()  # let the dialog map -> final size + re-center
+        dw, dh = dlg.win.winfo_width(), dlg.win.winfo_height()
+        # same basis center_over_parent uses: the parent's on-screen rect
+        ex = root.winfo_rootx() + (root.winfo_width() - dw) // 2
+        ey = root.winfo_rooty() + (root.winfo_height() - dh) // 3
+        result["dlg_centered"] = (abs(dlg.win.winfo_x() - ex) <= 4 and
+                                  abs(dlg.win.winfo_y() - ey) <= 4)
+        if os.environ.get("SD_DEBUG"):
+            print(f"    debug: dlg x={dlg.win.winfo_x()} y={dlg.win.winfo_y()} "
+                  f"w={dw} h={dh} expected=({ex},{ey}) mapped="
+                  f"{dlg.win.winfo_ismapped()}", flush=True)
+        dlg.win.destroy()
+        root.update()
     except Exception as e:
         result["error"] = str(e)
     finally:
@@ -91,5 +116,10 @@ print(f"  [{'PASS' if h[0] == 1 else 'FAIL'}] hide game: {h[0]} tile(s) in libra
 print(f"  [{'PASS' if h[1] == 1 else 'FAIL'}] hidden view: {h[1]} tile(s)")
 print(f"  [{'PASS' if h[2] else 'FAIL'}] password button visible in hidden view")
 ok = ok and h[0] == 1 and h[1] == 1 and h[2]
+print(f"  [{'PASS' if result.get('main_centered') else 'FAIL'}] "
+      f"main window centered on screen")
+print(f"  [{'PASS' if result.get('dlg_centered') else 'FAIL'}] "
+      f"dialog centered over parent")
+ok = ok and result.get("main_centered") and result.get("dlg_centered")
 print("UI SMOKE TEST OK" if ok and result["tiles"] == 2 else "UI SMOKE TEST FAILED")
 sys.exit(0 if ok and result["tiles"] == 2 else 1)

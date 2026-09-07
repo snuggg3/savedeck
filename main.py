@@ -90,6 +90,7 @@ def main():
     root.title(APP_TITLE)
     root.geometry("1220x800")
     T.apply(root)
+    T.center_on_screen(root, 1220, 800)
     app = SaveDeckApp(root, config, engine)
 
     minimized = "--minimized" in sys.argv[1:]

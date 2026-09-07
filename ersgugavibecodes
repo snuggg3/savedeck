@@ -1,0 +1,3 @@
+[33m5d2b459[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m hidden games: rename Shelf back to Hidden, add password set/remove dialog inside the hidden view
+[33m4bc0f9f[m fix: theme imported from savedeck, not savedeck.ui
+[33m6b89822[m SaveDeck 1.0.0: Cartridge library + SavePoint engine fused into one native app
