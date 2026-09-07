@@ -174,7 +174,7 @@ class BackupEngine:
     def start(self):
         self.refresh_watchers()
         self.catch_up_missed()
-        threading.Thread(target=self._loop, name="savepoint-scheduler", daemon=True).start()
+        threading.Thread(target=self._loop, name="savedeck-scheduler", daemon=True).start()
 
     def stop(self):
         self._stop.set()

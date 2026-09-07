@@ -1,8 +1,8 @@
 """SaveDeck UI design system.
 
-Cartridge's phosphor-terminal look (near-black green background, mono type,
-1px separators, flat controls) built on the SavePoint theme structure.
-Configure once with apply(root); dialogs pick the styles up automatically.
+A phosphor-terminal look (near-black green background, mono type, 1px
+separators, flat controls). Configure once with apply(root); dialogs pick
+the styles up automatically.
 """
 from __future__ import annotations
 

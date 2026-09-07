@@ -39,7 +39,7 @@ class GitHubProvider(CloudProvider):
     def __init__(self):
         self._token = ""
         self._session = requests.Session()
-        self._session.headers["User-Agent"] = "SavePoint/1.0"
+        self._session.headers["User-Agent"] = "SaveDeck/1.0"
 
     def configure(self, token=None, **kw):
         self._token = token or ""

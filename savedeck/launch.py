@@ -1,10 +1,10 @@
 """Game launching + play-session tracking.
 
-The session watcher is the Cartridge→SavePoint integration: when a game is
-launched from the library and its savepoint Game has process names configured,
-SaveDeck waits for the process to appear and then disappear, and triggers an
-immediate backup when you stop playing — saves are captured while fresh,
-never while the game is mid-write.
+The session watcher is the library↔engine integration: when a game is
+launched from the library and its engine game entry has process names
+configured, SaveDeck waits for the process to appear and then disappear, and
+triggers an immediate backup when you stop playing — saves are captured
+while fresh, never while the game is mid-write.
 """
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def watch_session(process_names, engine, game_id, log=print):
     ["elden ring.exe"]. Polling is deliberately lazy (15 s) — this thread
     costs nothing while the game runs.
     """
-    from savepoint.processes import is_running
+    from .engine.processes import is_running
 
     def _run():
         started = False

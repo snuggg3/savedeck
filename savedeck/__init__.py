@@ -1,9 +1,8 @@
-"""SaveDeck — Cartridge + SavePoint combined.
+"""SaveDeck - game library with built-in automatic save protection.
 
-Sets SAVEPOINT_HOME to SaveDeck's own data dir BEFORE savepoint.config is
-imported anywhere, so the vendored backup engine stores its config, state
-manifests and DPAPI fallback secrets inside %APPDATA%\\SaveDeck while the
-GitHub token stays shared through the Windows Credential Manager.
+Everything lives in one data dir (%APPDATA%\\SaveDeck): the library, the
+backup engine's config and per-game state, the cover-art cache and the log.
+Credentials (GitHub token) go to the Windows Credential Manager.
 """
 from __future__ import annotations
 
@@ -21,4 +20,3 @@ def home_dir() -> str:
 
 
 HOME = home_dir()
-os.environ.setdefault("SAVEPOINT_HOME", HOME)  # engine data lives with us

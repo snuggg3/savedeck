@@ -7,8 +7,8 @@ import tkinter as tk
 import uuid
 from tkinter import filedialog, messagebox, ttk
 
-from savepoint.detector import suggest_locations
-from savepoint.models import Game, safe_name
+from ..engine.detector import suggest_locations
+from ..engine.models import Game, safe_name
 
 from savedeck import library as lib
 from savedeck import theme as T
@@ -26,16 +26,16 @@ def _add_row(parent, r: int, label: str, widget, hint=None) -> int:
 
 
 def _provider_ids():
-    from savepoint.providers import provider_ids
+    from ..engine.providers import provider_ids
     return provider_ids()
 
 
 class GameDialog:
     """Edit a library entry and its save protection in one place.
 
-    This is the SavePoint→Cartridge integration: the protection half can
-    pre-fill save locations from SavePoint's heuristic detector, so going
-    from 'game in the library' to 'saves backed up' is one click.
+    The protection half can pre-fill save locations using the built-in
+    heuristic detector, so going from 'game in the library' to 'saves backed
+    up' is one click.
     """
 
     def __init__(self, parent, app, entry: dict, protect: bool = False,
@@ -236,7 +236,7 @@ class GameDialog:
 
 
 class SuggestDialog:
-    """Pick likely save locations found by SavePoint's detector."""
+    """Pick likely save locations found by the built-in detector."""
 
     def __init__(self, parent, candidates: list, paths_listbox):
         self.paths_listbox = paths_listbox
@@ -385,8 +385,8 @@ class SettingsDialog:
                   font=T.FONT_SMALL).grid(row=1, column=2, columnspan=2,
                                           sticky="w")
         ttk.Label(gf, text="Fine-grained PAT, Contents: read+write. The token "
-                           "lives in the Windows Credential Manager and is "
-                           "shared with SavePoint.", style="Faint.TLabel",
+                           "lives in the Windows Credential Manager and never "
+                           "leaves this PC.", style="Faint.TLabel",
                   font=T.FONT_SMALL).grid(row=2, column=0, columnspan=4,
                                           sticky="w", pady=(4, 0))
         gf.columnconfigure(1, weight=1)
@@ -429,14 +429,14 @@ class SettingsDialog:
         self.app.config.save()
 
     def _save_token(self):
-        from savepoint.credentials import set_secret
+        from ..engine.credentials import set_secret
         set_secret("token:github", self.token.get().strip())
         self.test_result.configure(text="token saved "
                                         "(Windows Credential Manager)",
                                    foreground=T.GREEN)
 
     def _test(self):
-        from savepoint.providers import get_provider
+        from ..engine.providers import get_provider
         self.test_result.configure(text="testing...", foreground=T.MUTED)
 
         def worker():
@@ -465,7 +465,7 @@ class SettingsDialog:
         self.app.config.save()
 
     def _export(self):
-        from savepoint.config import export_config
+        from ..engine.config import export_config
         path = filedialog.asksaveasfilename(
             parent=self.win, defaultextension=".json",
             filetypes=[("SaveDeck config", "*.json")],
@@ -478,10 +478,9 @@ class SettingsDialog:
                             parent=self.win)
 
     def _import(self):
-        from savepoint.config import parse_config_export
+        from ..engine.config import parse_config_export
         path = filedialog.askopenfilename(
-            parent=self.win,
-            filetypes=[("SaveDeck/SavePoint config", "*.json")])
+            parent=self.win, filetypes=[("SaveDeck config", "*.json")])
         if not path:
             return
         try:
@@ -507,7 +506,7 @@ class SettingsDialog:
 
     def _open_log(self):
         from savedeck import home_dir
-        log = os.path.join(home_dir(), "savepoint.log")
+        log = os.path.join(home_dir(), "savedeck.log")
         if os.path.isfile(log):
             os.startfile(log)
 

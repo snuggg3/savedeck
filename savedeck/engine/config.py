@@ -1,50 +1,21 @@
-"""Application configuration storage (atomic JSON file in %APPDATA%)."""
+"""SaveDeck backup-engine configuration storage (atomic JSON in %APPDATA%)."""
 from __future__ import annotations
 
 import json
 import os
-import shutil
 import threading
 
+from .. import home_dir
 from .models import Game
 
-APP_NAME = "SavePoint"
-LEGACY_APP_NAME = "CloudSaveGuard"  # app name before the 1.0 rename
+APP_NAME = "SaveDeck"
 
 
 def app_dir() -> str:
-    """Directory holding config/state. Override with SAVEPOINT_HOME (useful for tests)."""
-    base = os.environ.get("SAVEPOINT_HOME") or os.path.join(
-        os.environ.get("APPDATA", os.path.expanduser("~")), APP_NAME)
+    """Directory holding config/state (SaveDeck's data dir)."""
+    base = home_dir()
     os.makedirs(base, exist_ok=True)
     return base
-
-
-def ensure_migrated():
-    """One-time migration of user data from the old 'CloudSaveGuard' folder."""
-    old = os.environ.get("CLOUDSAVEGUARD_HOME") or os.path.join(
-        os.environ.get("APPDATA", os.path.expanduser("~")), LEGACY_APP_NAME)
-    new = app_dir()
-    if os.path.normcase(os.path.abspath(old)) == os.path.normcase(os.path.abspath(new)):
-        return
-    if not os.path.isdir(old):
-        return
-    # config file
-    old_cfg, new_cfg = os.path.join(old, "config.json"), os.path.join(new, "config.json")
-    if os.path.isfile(old_cfg) and not os.path.isfile(new_cfg):
-        shutil.copy2(old_cfg, new_cfg)
-    # per-game manifests
-    old_state, new_state = os.path.join(old, "state"), os.path.join(new, "state")
-    if os.path.isdir(old_state):
-        os.makedirs(new_state, exist_ok=True)
-        for fn in os.listdir(old_state):
-            src, dst = os.path.join(old_state, fn), os.path.join(new_state, fn)
-            if os.path.isfile(src) and not os.path.isfile(dst):
-                shutil.copy2(src, dst)
-    # DPAPI fallback secrets (only used when the keyring package is unavailable)
-    old_sec, new_sec = os.path.join(old, "secrets.bin"), os.path.join(new, "secrets.bin")
-    if os.path.isfile(old_sec) and not os.path.isfile(new_sec):
-        shutil.copy2(old_sec, new_sec)
 
 
 def state_dir() -> str:
@@ -64,7 +35,7 @@ def export_config(config: "Config", path: str) -> int:
     Manager and never leave this PC).
     """
     data = {
-        "savepoint_config": CONFIG_FORMAT,
+        "savedeck_config": CONFIG_FORMAT,
         "exported": now_iso(),
         "settings": {"provider": config.settings.get("provider", "github"),
                      "providers": config.settings.get("providers", {})},
@@ -87,7 +58,7 @@ def parse_config_export(path: str):
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, dict) or not isinstance(data.get("games"), list):
-        raise ValueError("Not a SavePoint config export")
+        raise ValueError("Not a SaveDeck config export")
     settings = data.get("settings") or {}
     if not isinstance(settings, dict):
         settings = {}
@@ -104,7 +75,6 @@ def now_iso() -> str:
 
 class Config:
     def __init__(self):
-        ensure_migrated()
         self.path = os.path.join(app_dir(), "config.json")
         self.settings = {"provider": "github", "providers": {}}
         self.games: list[Game] = []

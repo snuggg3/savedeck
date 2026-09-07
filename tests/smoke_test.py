@@ -1,4 +1,4 @@
-"""Headless smoke test: core logic without showing the window."""
+﻿"""Headless smoke test: core logic without showing the window."""
 import os
 import sys
 import tempfile
@@ -9,9 +9,9 @@ TMP = tempfile.mkdtemp(prefix="savedeck-test-")
 os.environ["SAVEDECK_HOME"] = TMP  # isolate: never touch the real config
 
 from savedeck import detect, launch, art, library as lib          # noqa: E402
-from savepoint.config import Config                                # noqa: E402
-from savepoint.engine import BackupEngine                          # noqa: E402
-from savepoint.models import Game                                  # noqa: E402
+from savedeck.engine.config import Config                                # noqa: E402
+from savedeck.engine.engine import BackupEngine                          # noqa: E402
+from savedeck.engine.models import Game                                  # noqa: E402
 
 failures = []
 

@@ -1,4 +1,4 @@
-"""UI smoke test: construct the full window, let it settle, auto-close."""
+﻿"""UI smoke test: construct the full window, let it settle, auto-close."""
 import faulthandler
 import os
 import sys
@@ -12,8 +12,8 @@ TMP = tempfile.mkdtemp(prefix="savedeck-uitest-")
 os.environ["SAVEDECK_HOME"] = TMP
 
 from savedeck import library as lib            # noqa: E402
-from savepoint.config import Config             # noqa: E402
-from savepoint.engine import BackupEngine       # noqa: E402
+from savedeck.engine.config import Config             # noqa: E402
+from savedeck.engine.engine import BackupEngine       # noqa: E402
 from savedeck import theme                       # noqa: E402
 from savedeck.ui.app import SaveDeckApp          # noqa: E402
 

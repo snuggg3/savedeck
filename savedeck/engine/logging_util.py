@@ -1,4 +1,4 @@
-"""Rolling application log file: %APPDATA%/SavePoint/savepoint.log.
+"""Rolling application log file: %APPDATA%/SaveDeck/savedeck.log.
 
 The engine mirrors its log messages here so backups can be diagnosed after
 the fact (especially when running silently in the tray). Uses only the
@@ -13,14 +13,14 @@ import os
 
 from .config import app_dir
 
-_LOGGER_NAME = "savepoint"
+_LOGGER_NAME = "savedeck"
 _MAX_BYTES = 1 << 20  # 1 MB per file before rotation
-_BACKUPS = 3          # keep savepoint.log.1 .. savepoint.log.3
+_BACKUPS = 3          # keep savedeck.log.1 .. savedeck.log.3
 _LEVELS = {"info": logging.INFO, "warn": logging.WARNING, "error": logging.ERROR}
 
 
 def get_log_path() -> str:
-    return os.path.join(app_dir(), "savepoint.log")
+    return os.path.join(app_dir(), "savedeck.log")
 
 
 def setup_logger() -> logging.Logger:

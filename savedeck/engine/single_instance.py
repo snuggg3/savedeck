@@ -1,6 +1,6 @@
 ﻿"""Single-instance guard.
 
-A named Windows mutex ensures only one SavePoint runs at a time (two copies
+A named Windows mutex ensures only one SaveDeck runs at a time (two copies
 would both watch the same folders and write interleaved log lines). A second
 launch focuses the existing window instead of starting a second engine.
 """
@@ -19,7 +19,7 @@ _mutex = None  # keep the handle alive for the process lifetime
 
 
 def acquire() -> bool:
-    """Become the single running SavePoint.
+    """Become the single running SaveDeck.
 
     Returns False if another copy already holds the mutex (caller should call
     focus_existing() and exit). On non-Windows or if anything fails, always

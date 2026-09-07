@@ -36,7 +36,7 @@ class LocalFolderProvider(CloudProvider):
     def test_connection(self, repo: str = "") -> str:
         if repo:
             os.makedirs(repo, exist_ok=True)
-            probe = os.path.join(repo, ".savepoint_write_test")
+            probe = os.path.join(repo, ".savedeck_write_test")
             with open(probe, "w") as f:
                 f.write("ok")
             os.remove(probe)

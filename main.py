@@ -12,10 +12,10 @@ import tkinter as tk
 
 from savedeck import APP_NAME, VERSION
 from savedeck import library as lib
-from savedeck.library import migrate_from_cartridge, migrate_from_savepoint
-from savepoint.config import Config
-from savepoint.engine import BackupEngine
-from savepoint.single_instance import acquire, focus_existing
+from savedeck.library import migrate_from_cartridge
+from savedeck.engine.config import Config
+from savedeck.engine.engine import BackupEngine
+from savedeck.engine.single_instance import acquire, focus_existing
 from savedeck.ui.app import SaveDeckApp
 from savedeck import theme as T
 
@@ -76,8 +76,6 @@ def main():
         focus_existing()  # already running: just bring that window forward
         return
 
-    if migrate_from_savepoint():
-        print("SaveDeck: adopted your existing SavePoint config")
     imported = migrate_from_cartridge()
     if imported:
         print(f"SaveDeck: imported {imported} game(s) from Cartridge")

@@ -1,8 +1,8 @@
-"""Library store — SaveDeck's game collection (Cartridge-compatible).
+"""Library store — SaveDeck's game collection.
 
 A plain JSON file in the app data dir. Each entry is a dict:
 
-    id            stable uuid (matches the SavePoint game id when protected)
+    id            stable uuid (also the backup-engine game id when protected)
     name          display name
     source        steam | epic | gog | manual
     thumbnail     image URL, data URL, local path or None
@@ -10,12 +10,12 @@ A plain JSON file in the app data dir. Each entry is a dict:
     launchTarget  steam:// URL, launcher protocol, exe path or shell command
     sizeBytes     install size (from scans)
     favorite      bool - floats to the top
-    hidden        bool - moved to the private shelf
-    sp_id         id of the linked savepoint.models.Game ("" = unprotected)
+    hidden        bool - moved to the hidden view
+    sp_id         id of the linked engine game entry ("" = unprotected)
     addedAt       ISO timestamp
 
-On first run it imports an existing Cartridge library and an existing
-SavePoint config, so upgrading from either app is automatic.
+On first run it can import an existing Cartridge library, so upgrading is
+automatic.
 """
 from __future__ import annotations
 
@@ -116,40 +116,7 @@ def migrate_from_cartridge() -> int:
     return len(lib["games"])
 
 
-def migrate_from_savepoint() -> bool:
-    """Adopt an existing SavePoint config on first run.
-
-    The vendored engine reads SAVEPOINT_HOME (pointed at SaveDeck's dir by
-    savedeck/__init__), so its config.json, per-game state manifests and the
-    DPAPI fallback secrets move in wholesale. The GitHub token itself is
-    shared through the Windows Credential Manager either way.
-    """
-    cfg = os.path.join(data_dir(), "config.json")
-    if os.path.isfile(cfg):
-        return False
-    old = os.path.join(os.environ.get("APPDATA", ""), "SavePoint")
-    if not os.path.isfile(os.path.join(old, "config.json")):
-        return False
-    try:
-        shutil.copy2(os.path.join(old, "config.json"), cfg)
-        old_state = os.path.join(old, "state")
-        if os.path.isdir(old_state):
-            new_state = os.path.join(data_dir(), "state")
-            os.makedirs(new_state, exist_ok=True)
-            for fn in os.listdir(old_state):
-                if fn.endswith(".json"):
-                    dst = os.path.join(new_state, fn)
-                    if not os.path.isfile(dst):
-                        shutil.copy2(os.path.join(old_state, fn), dst)
-        old_sec = os.path.join(old, "secrets.bin")
-        if os.path.isfile(old_sec):
-            shutil.copy2(old_sec, os.path.join(data_dir(), "secrets.bin"))
-        return True
-    except Exception:
-        return False
-
-
-# -- private shelf password -----------------------------------------------------
+# -- hidden view password -----------------------------------------------------
 def _hidden_file() -> str:
     return os.path.join(data_dir(), "hidden.json")
 

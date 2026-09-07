@@ -10,8 +10,10 @@ import base64
 import json
 import os
 
-SERVICE = "SavePoint"
-_LEGACY_SERVICE = "CloudSaveGuard"  # credential service name before the rename
+SERVICE = "SaveDeck"
+# Credentials saved by pre-1.0 builds under other service names are found and
+# migrated automatically (one-time, silent) so tokens keep working.
+_LEGACY_SERVICES = ("SavePoint", "CloudSaveGuard")
 
 try:
     import keyring  # noqa: F401
@@ -108,18 +110,20 @@ def get_secret(name: str):
         except Exception:
             return None
         if value is None:
-            # Migrate credentials stored under the pre-rename service name.
-            try:
-                legacy = keyring.get_password(_LEGACY_SERVICE, name)
-            except Exception:
-                legacy = None
-            if legacy is not None:
+            # Migrate credentials stored under pre-1.0 service names.
+            for legacy_name in _LEGACY_SERVICES:
                 try:
-                    keyring.set_password(SERVICE, name, legacy)
-                    keyring.delete_password(_LEGACY_SERVICE, name)
+                    legacy = keyring.get_password(legacy_name, name)
                 except Exception:
-                    pass
-                value = legacy
+                    legacy = None
+                if legacy is not None:
+                    try:
+                        keyring.set_password(SERVICE, name, legacy)
+                        keyring.delete_password(legacy_name, name)
+                    except Exception:
+                        pass
+                    value = legacy
+                    break
         return value
     if os.name == "nt":
         return _fallback_load().get(name)
