@@ -17,7 +17,7 @@ from savepoint.config import Config
 from savepoint.engine import BackupEngine
 from savepoint.single_instance import acquire, focus_existing
 from savedeck.ui.app import SaveDeckApp
-from savedeck.ui import theme as T
+from savedeck import theme as T
 
 APP_TITLE = f"SaveDeck v{VERSION} - game library + save protection"
 
