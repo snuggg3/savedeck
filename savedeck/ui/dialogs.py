@@ -289,6 +289,65 @@ class PasswordDialog:
                                  parent=self.win)
 
 
+class PasswordSetDialog:
+    """Set, change or remove the hidden-games password."""
+
+    def __init__(self, parent):
+        self.win = T.toplevel(parent, "Hidden games - password",
+                              resizable=(False, False))
+        frame = ttk.Frame(self.win, padding=16)
+        frame.pack(fill="both", expand=True)
+        has = lib.hidden_password_set()
+        ttk.Label(frame,
+                  text="A password is currently set for hidden games."
+                  if has else "No password is set - hidden games are open "
+                              "to anyone using this PC.",
+                  style="Muted.TLabel").grid(row=0, column=0, columnspan=2,
+                                             sticky="w")
+        ttk.Label(frame, text="New password:", style="Muted.TLabel").grid(
+            row=1, column=0, padx=(0, 8), pady=(12, 0), sticky="w")
+        self.pw = ttk.Entry(frame, show="•", width=24)
+        self.pw.grid(row=1, column=1, pady=(12, 0))
+        ttk.Label(frame, text="Confirm:", style="Muted.TLabel").grid(
+            row=2, column=0, padx=(0, 8), pady=(6, 0), sticky="w")
+        self.pw2 = ttk.Entry(frame, show="•", width=24)
+        self.pw2.grid(row=2, column=1, pady=(6, 0))
+        ttk.Label(frame, text="Leave empty to remove the password.",
+                  style="Faint.TLabel", font=T.FONT_SMALL).grid(
+            row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))
+
+        btns = ttk.Frame(frame)
+        btns.grid(row=4, column=0, columnspan=2, sticky="e", pady=(14, 0))
+        ttk.Button(btns, text="CANCEL",
+                   command=self.win.destroy).pack(side="left", padx=4)
+        if has:
+            ttk.Button(btns, text="REMOVE",
+                       command=self._remove).pack(side="left", padx=4)
+        ttk.Button(btns, text="SET PASSWORD", style="Accent.TButton",
+                   command=self._set).pack(side="left")
+        self.pw.focus_set()
+        self.win.bind("<Escape>", lambda _e: self.win.destroy())
+
+    def _set(self):
+        a, b = self.pw.get(), self.pw2.get()
+        if a != b:
+            messagebox.showerror("SaveDeck", "Passwords do not match.",
+                                 parent=self.win)
+            return
+        lib.set_hidden_password(a)
+        messagebox.showinfo("SaveDeck",
+                            "Password removed - hidden games are open."
+                            if not a else "Password set.", parent=self.win)
+        self.win.destroy()
+
+    def _remove(self):
+        lib.set_hidden_password("")
+        messagebox.showinfo("SaveDeck",
+                            "Password removed - hidden games are open.",
+                            parent=self.win)
+        self.win.destroy()
+
+
 class SettingsDialog:
     """Credentials, default destination, notifications, import/export."""
 

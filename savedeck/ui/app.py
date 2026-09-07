@@ -94,8 +94,12 @@ class SaveDeckApp:
 
         btns = ttk.Frame(header, style="Crust.TFrame")
         btns.pack(side="right")
-        self.shelf_btn = ttk.Button(btns, text="SHELF", command=self.open_shelf)
-        self.shelf_btn.pack(side="left", padx=3)
+        self.hidden_btn = ttk.Button(btns, text="HIDDEN",
+                                     command=self.open_hidden)
+        self.hidden_btn.pack(side="left", padx=3)
+        self.pw_btn = ttk.Button(btns, text="🔑 PASSWORD",
+                                 command=self.set_password)
+        # password management lives inside the hidden view (Cartridge parity)
         ttk.Button(btns, text="SCAN", command=self.scan).pack(side="left", padx=3)
         ttk.Button(btns, text="+ ADD", command=self.add_manual).pack(
             side="left", padx=3)
@@ -177,7 +181,7 @@ class SaveDeckApp:
         for c in range(cols):
             self.inner.columnconfigure(c, weight=1)
         if not games:
-            msg = ("hidden shelf is empty" if self.showing_hidden
+            msg = ("no hidden games" if self.showing_hidden
                    else "no games - press SCAN or + ADD")
             ttk.Label(self.inner, text=msg, style="Faint.TLabel").grid(
                 row=0, column=0, pady=60)
@@ -323,17 +327,24 @@ class SaveDeckApp:
             lib.save_library(self.lib)
             self.populate()
 
-    def open_shelf(self):
+    def open_hidden(self):
         if not self.showing_hidden and lib.hidden_password_set():
-            dialogs.PasswordDialog(self.root, on_ok=self._show_hidden)
+            dialogs.PasswordDialog(self.root, on_ok=self._toggle_hidden_view)
         else:
-            self._show_hidden()
+            self._toggle_hidden_view()
 
-    def _show_hidden(self):
+    def _toggle_hidden_view(self):
         self.showing_hidden = not self.showing_hidden
-        self.shelf_btn.configure(
-            text="LIBRARY" if self.showing_hidden else "SHELF")
+        self.hidden_btn.configure(
+            text="LIBRARY" if self.showing_hidden else "HIDDEN")
+        if self.showing_hidden:
+            self.pw_btn.pack(side="left", padx=3, after=self.hidden_btn)
+        else:
+            self.pw_btn.pack_forget()
         self.populate()
+
+    def set_password(self):
+        dialogs.PasswordSetDialog(self.root)
 
     def open_settings(self):
         dialogs.SettingsDialog(self.root, self)

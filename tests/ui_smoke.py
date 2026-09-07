@@ -53,6 +53,21 @@ def settle():
         result["filtered"] = filtered
         app.search_var.set("")
         root.update_idletasks()
+        # hidden-games flow: hide a game, view it, unhide it
+        app.toggle_hidden(app.lib["games"][0])
+        root.update_idletasks()
+        after_hide = len([w for w in app.inner.winfo_children()
+                          if isinstance(w, tk.Frame)])
+        app.open_hidden()  # no password set -> enters directly
+        root.update_idletasks()
+        hidden_view = len([w for w in app.inner.winfo_children()
+                           if isinstance(w, tk.Frame)])
+        pw_btn_visible = bool(app.pw_btn.winfo_manager())
+        app._toggle_hidden_view()  # back to library
+        root.update_idletasks()
+        app.toggle_hidden(app.lib["games"][0])  # restore
+        root.update_idletasks()
+        result["hidden"] = (after_hide, hidden_view, pw_btn_visible)
     except Exception as e:
         result["error"] = str(e)
     finally:
@@ -71,5 +86,10 @@ print(f"  [{'PASS' if result['tiles'] == 2 else 'FAIL'}] tile grid: "
       f"{result['tiles']} tiles")
 print(f"  [{'PASS' if result.get('filtered') == 1 else 'FAIL'}] search filter: "
       f"{result.get('filtered')} tile(s)")
+h = result.get("hidden") or (0, 0, False)
+print(f"  [{'PASS' if h[0] == 1 else 'FAIL'}] hide game: {h[0]} tile(s) in library")
+print(f"  [{'PASS' if h[1] == 1 else 'FAIL'}] hidden view: {h[1]} tile(s)")
+print(f"  [{'PASS' if h[2] else 'FAIL'}] password button visible in hidden view")
+ok = ok and h[0] == 1 and h[1] == 1 and h[2]
 print("UI SMOKE TEST OK" if ok and result["tiles"] == 2 else "UI SMOKE TEST FAILED")
 sys.exit(0 if ok and result["tiles"] == 2 else 1)
