@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime as dt
 import os
 import queue
+import re
 import threading
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -243,11 +244,33 @@ class SaveDeckApp:
         threading.Thread(target=worker, daemon=True).start()
 
 
+    @staticmethod
+    def _game_folder(entry: dict) -> str:
+        """Best-effort install/source folder for a library entry."""
+        path = entry.get("installPath") or ""
+        if os.path.isdir(path):
+            return path
+        target = (entry.get("launchTarget") or "").strip()
+        if target and "://" not in target:
+            m = re.match(r'^"([^"]+)"', target)
+            exe = m.group(1) if m else target.split()[0].strip('"')
+            if os.path.isfile(exe):
+                return os.path.dirname(exe)
+        return ""
+
+    def open_folder(self, entry: dict):
+        folder = self._game_folder(entry)
+        if folder:
+            os.startfile(folder)
+
     def tile_menu(self, entry: dict, tile: tk.Frame):
         menu = tk.Menu(tile, tearoff=0, bg=T.PANEL, fg=T.TEXT,
                        activebackground=T.SURFACE, activeforeground=T.GREEN,
                        font=T.FONT_SMALL)
         menu.add_command(label="▶ Run", command=lambda: self.run_game(entry))
+        if self._game_folder(entry):
+            menu.add_command(label="Open folder",
+                             command=lambda: self.open_folder(entry))
         game = self._sp_game(entry)
         if game:
             menu.add_command(label="⛨ Back up now",

@@ -69,8 +69,10 @@ class GameDialog:
         self.install = ttk.Entry(install_box, width=36)
         self.install.insert(0, entry.get("installPath") or "")
         self.install.pack(side="left", fill="x", expand=True)
+        ttk.Button(install_box, text="OPEN", width=6,
+                   command=self._open_install).pack(side="left", padx=(6, 0))
         ttk.Button(install_box, text="...", width=3,
-                   command=self._browse_install).pack(side="left", padx=(6, 0))
+                   command=self._browse_install).pack(side="left", padx=(4, 0))
         r = _add_row(lf, r, "Install path", install_box)
         lf.columnconfigure(1, weight=1)
 
@@ -162,6 +164,15 @@ class GameDialog:
         if path:
             self.install.delete(0, "end")
             self.install.insert(0, path)
+
+    def _open_install(self):
+        path = self.install.get().strip()
+        if os.path.isdir(path):
+            os.startfile(path)
+        else:
+            messagebox.showwarning(
+                "SaveDeck", "Folder does not exist (yet):\n" + (path or "-"),
+                parent=self.win)
 
     def _suggest(self):
         name = self.name.get().strip()
