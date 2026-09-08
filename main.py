@@ -6,6 +6,8 @@ Usage:
 """
 from __future__ import annotations
 
+import os
+import re
 import sys
 import threading
 import tkinter as tk
@@ -112,10 +114,15 @@ def main():
 
     root = tk.Tk()
     root.title(APP_TITLE)
-    root.geometry("1220x800")
     root.minsize(900, 560)
     T.apply(root)
-    T.center_on_screen(root, 1220, 800)
+    saved_geo = config.settings.get("geometry", "")
+    if isinstance(saved_geo, str) and \
+            re.match(r"^\d+x\d+[+-]\d+[+-]\d+$", saved_geo):
+        root.geometry(saved_geo)  # remembered size/position
+    else:
+        root.geometry("1220x800")
+        T.center_on_screen(root, 1220, 800)
     app = SaveDeckApp(root, config, engine)
 
     minimized = "--minimized" in sys.argv[1:]
@@ -123,6 +130,7 @@ def main():
 
     def quit_app():
         state["quit"] = True
+        app.save_geometry()
         engine.stop()
         try:
             root.destroy()
@@ -134,6 +142,7 @@ def main():
 
     def on_close():
         if state["tray"] is not None:
+            app.save_geometry()
             root.withdraw()  # keep protecting saves in the background
         else:
             quit_app()

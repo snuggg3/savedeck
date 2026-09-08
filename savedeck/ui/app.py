@@ -56,6 +56,61 @@ def dir_size(path: str) -> int:
     return total
 
 
+class Tooltip:
+    """Small styled hover tooltip (delayed, self-destructing on leave)."""
+
+    def __init__(self, widget, get_text, delay: int = 500):
+        self.widget, self.get_text, self.delay = widget, get_text, delay
+        self._id = None
+        self._tip = None
+        widget.bind("<Enter>", self._schedule, add="+")
+        widget.bind("<Leave>", self._hide, add="+")
+        widget.bind("<ButtonPress>", self._hide, add="+")
+
+    def _cancel(self):
+        if self._id:
+            try:
+                self.widget.after_cancel(self._id)
+            except tk.TclError:
+                pass
+            self._id = None
+
+    def _schedule(self, _e=None):
+        self._cancel()
+        self._id = self.widget.after(self.delay, self._show)
+
+    def _show(self):
+        self._id = None
+        text = self.get_text()
+        if not text:
+            return
+        self._hide_tip()
+        # title starts with "SaveDeck": hide_stray_windows must never treat
+        # this tooltip as a stray helper window
+        self._tip = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_title("SaveDeck tooltip")
+        x = self.widget.winfo_rootx() + 12
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 6
+        tw.wm_geometry(f"+{x}+{y}")
+        tk.Label(tw, text=text, justify="left", background=T.PANEL,
+                 foreground=T.TEXT, relief="solid", borderwidth=1,
+                 font=T.FONT_SMALL, padx=6, pady=4).pack()
+        tw.lift()
+
+    def _hide(self, _e=None):
+        self._cancel()
+        self._hide_tip()
+
+    def _hide_tip(self):
+        if self._tip is not None:
+            try:
+                self._tip.destroy()
+            except tk.TclError:
+                pass
+            self._tip = None
+
+
 class SaveDeckApp:
     def __init__(self, root: tk.Tk, config, engine):
         self.root = root
@@ -72,8 +127,34 @@ class SaveDeckApp:
         self._build_status()
         self._bind_keys()
         self.populate()
+        self._geo_job = None
+        self.root.bind("<Configure>", self._on_root_configure)
         self.root.after(150, self._poll)
         self.root.after(15000, self._refresh_status_loop)
+
+    # -- window geometry persistence -----------------------------------------
+    def _on_root_configure(self, event):
+        if event.widget is not self.root:
+            return
+        if self._geo_job:
+            self.root.after_cancel(self._geo_job)
+        self._geo_job = self.root.after(800, self._save_geometry)
+
+    def _save_geometry(self):
+        self._geo_job = None
+        self.save_geometry()
+
+    def save_geometry(self):
+        """Persist window size/position (skipped while maximized)."""
+        try:
+            if self.root.state() == "zoomed":
+                return
+            geo = self.root.geometry()
+            if re.match(r"^\d+x\d+[+-]\d+[+-]\d+$", geo):
+                self.config.settings["geometry"] = geo
+                self.config.save()
+        except tk.TclError:
+            pass
 
     # -- layout -------------------------------------------------------------
     def _build_header(self):
@@ -88,12 +169,15 @@ class SaveDeckApp:
         self.search = ttk.Entry(header, textvariable=self.search_var, width=24)
         self.search.pack(side="left", padx=(24, 6))
 
-        self.sort_var = tk.StringVar(value="A → Z")
+        self.sort_var = tk.StringVar(
+            value=self.lib.get("sort")
+            if self.lib.get("sort") in ("A → Z", "Z → A", "Recently backed up")
+            else "A → Z")
         sort = ttk.Combobox(header, textvariable=self.sort_var, state="readonly",
                             width=9,
                             values=("A → Z", "Z → A", "Recently backed up"))
         sort.pack(side="left", padx=(16, 0))
-        sort.bind("<<ComboboxSelected>>", lambda _e: self.populate())
+        sort.bind("<<ComboboxSelected>>", lambda _e: self._on_sort_change())
 
         btns = ttk.Frame(header, style="Crust.TFrame")
         btns.pack(side="right")
@@ -173,6 +257,11 @@ class SaveDeckApp:
     def _clear_search(self, _e=None):
         self.search_var.set("")
         self.canvas.focus_set()
+
+    def _on_sort_change(self):
+        self.lib["sort"] = self.sort_var.get()  # remembered across restarts
+        lib.save_library(self.lib)
+        self.populate()
 
     def _on_wheel(self, e):
         # never scroll into blank space when the whole grid fits the view
@@ -272,7 +361,29 @@ class SaveDeckApp:
             w.bind("<Leave>", lambda _e, t=tile: t.configure(
                 highlightbackground=T.BORDER))
         self._load_art(entry, img)
+        Tooltip(tile, lambda: self._tile_tooltip(entry))
         return tile
+
+    def _tile_tooltip(self, entry: dict) -> str:
+        lines = [entry.get("name", "")]
+        folder = self._game_folder(entry)
+        if folder:
+            lines.append(folder)
+        game = self._sp_game(entry)
+        if game is None:
+            lines.append("No save protection - right-click > Protect saves...")
+            return "\n".join(lines)
+        if not game.enabled or not game.paths:
+            lines.append("Protection disabled")
+            return "\n".join(lines)
+        state = ("paused" if self.engine.is_paused() else
+                 {"ok": "backed up", "error": "backup FAILED",
+                  "never": "never backed up"}.get(game.last_status,
+                                                  game.last_status))
+        lines.append(f"Last backup: {game.last_backup or 'never'} ({state})")
+        lines.append(f"{len(game.paths)} save location(s) -> "
+                     f"{game.repo or 'destination not set'}")
+        return "\n".join(lines)
 
     def _meta_line(self, entry: dict) -> str:
         src = SOURCE_LABEL.get(entry.get("source"), "MANUAL")
@@ -374,6 +485,7 @@ class SaveDeckApp:
 
     def quit_app(self):
         """Full exit (window close only hides to the tray)."""
+        self.save_geometry()
         self.engine.stop()
         self.root.destroy()
 

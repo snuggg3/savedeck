@@ -123,6 +123,28 @@ def settle():
         result["dlg_aligned"] = aligned
         gd.win.destroy()
         root.update()
+        # sort choice persistence
+        app.sort_var.set("Z → A")
+        app._on_sort_change()
+        result["sort_saved"] = lib.load_library().get("sort") == "Z → A"
+        app.sort_var.set("A → Z")
+        app._on_sort_change()
+        # window geometry persistence
+        app.save_geometry()
+        result["geo_saved"] = (app.config.settings.get("geometry")
+                               == root.geometry())
+        # tile tooltip: shows on demand, self-destructs on hide
+        from savedeck.ui.app import Tooltip
+        lbl = tk.Label(root, text="tip-target")
+        lbl.pack()
+        tip = Tooltip(lbl, lambda: "tooltip text")
+        tip._show()
+        root.update()
+        shown = tip._tip is not None and bool(tip._tip.winfo_exists())
+        tip._hide()
+        result["tooltip"] = shown and tip._tip is None
+        lbl.destroy()
+        root.update()
     except Exception as e:
         result["error"] = str(e)
     finally:
@@ -154,7 +176,15 @@ print(f"  [{'PASS' if result.get('dlg_aligned') else 'FAIL'}] "
       f"game dialog labels aligned with widgets")
 print(f"  [{'PASS' if result.get('statusbar') else 'FAIL'}] "
       f"status-bar actions + sort modes present")
+print(f"  [{'PASS' if result.get('sort_saved') else 'FAIL'}] "
+      f"sort choice persisted")
+print(f"  [{'PASS' if result.get('geo_saved') else 'FAIL'}] "
+      f"window geometry persisted")
+print(f"  [{'PASS' if result.get('tooltip') else 'FAIL'}] "
+      f"tile tooltip shows and hides")
 ok = (ok and result.get("main_centered") and result.get("dlg_centered")
-      and result.get("dlg_aligned") and result.get("statusbar"))
+      and result.get("dlg_aligned") and result.get("statusbar")
+      and result.get("sort_saved") and result.get("geo_saved")
+      and result.get("tooltip"))
 print("UI SMOKE TEST OK" if ok and result["tiles"] == 2 else "UI SMOKE TEST FAILED")
 sys.exit(0 if ok and result["tiles"] == 2 else 1)
