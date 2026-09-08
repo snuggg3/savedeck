@@ -102,9 +102,10 @@ class GameDialog:
         pbtns = ttk.Frame(paths_box)
         pbtns.pack(side="left", padx=(6, 0), fill="y")
         for text, cmd in (("Suggest", self._suggest),
-                          ("Add...", self._add_path),
+                          ("Add Folder...", self._add_folder),
+                          ("Add File...", self._add_file),
                           ("Remove", self._remove_path)):
-            ttk.Button(pbtns, text=text, width=9,
+            ttk.Button(pbtns, text=text, width=13,
                        command=cmd).pack(fill="x", pady=1)
         for p in (game.paths if game else []):
             self.paths.insert("end", p)
@@ -180,9 +181,13 @@ class GameDialog:
             return
         SuggestDialog(self.win, suggest_locations(name), self.paths)
 
-    def _add_path(self):
-        path = filedialog.askdirectory(parent=self.win) or \
-            filedialog.askopenfilename(parent=self.win)
+    def _add_folder(self):
+        path = filedialog.askdirectory(parent=self.win)
+        if path:
+            self.paths.insert("end", path)
+
+    def _add_file(self):
+        path = filedialog.askopenfilename(parent=self.win)
         if path:
             self.paths.insert("end", path)
 
@@ -403,11 +408,18 @@ class SettingsDialog:
         ttk.Checkbutton(bf, text="Toast notification when a backup fails",
                         variable=self.notify_var,
                         command=self._toggle_notify).pack(anchor="w")
+        self.confirm_var = tk.BooleanVar(
+            value=settings.get("confirm_launch", False))
+        ttk.Checkbutton(bf, text="Confirm before launching a game",
+                        variable=self.confirm_var,
+                        command=self._toggle_confirm).pack(anchor="w")
 
         mf = ttk.Labelframe(frame, text="MAINTENANCE", padding=10)
         mf.pack(fill="x", pady=(10, 0))
         row = ttk.Frame(mf)
         row.pack(fill="x")
+        ttk.Button(row, text="Check for updates...",
+                   command=self._check_updates).pack(side="left", padx=2)
         ttk.Button(row, text="Storage report...",
                    command=self._storage).pack(side="left", padx=2)
         ttk.Button(row, text="Export config...",
@@ -463,6 +475,57 @@ class SettingsDialog:
     def _toggle_notify(self):
         self.app.config.settings["notify_on_failures"] = self.notify_var.get()
         self.app.config.save()
+
+    def _toggle_confirm(self):
+        self.app.config.settings["confirm_launch"] = self.confirm_var.get()
+        self.app.config.save()
+
+    def _check_updates(self):
+        self.test_result.configure(text="checking for updates...",
+                                   foreground=T.MUTED)
+
+        def worker():
+            from savedeck import update
+            try:
+                current, latest, url = update.check()
+            except Exception as e:
+                self.win.after(0, lambda: self.test_result.configure(
+                    text=f"update check failed: {e}", foreground=T.RED))
+                return
+            if not update.is_newer(latest, current):
+                self.win.after(0, lambda: self.test_result.configure(
+                    text=f"up to date (v{current})", foreground=T.GREEN))
+                return
+            self.win.after(0, lambda: self._offer_update(latest, url))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _offer_update(self, latest: str, url: str):
+        self.test_result.configure(text=f"update available: v{latest}",
+                                   foreground=T.YELLOW)
+        if not messagebox.askyesno(
+                "SaveDeck", f"Version v{latest} is available.\n"
+                "Download and install it now?", parent=self.win):
+            return
+        self.test_result.configure(text="downloading update...",
+                                   foreground=T.MUTED)
+
+        def worker():
+            from savedeck import update
+            try:
+                msg = update.apply_update(
+                    url, on_progress=lambda done, total: self.win.after(
+                        0, lambda: self.test_result.configure(
+                            text=f"downloading update... "
+                                 f"{done * 100 // max(total, 1)}%")))
+            except Exception as e:
+                self.win.after(0, lambda: self.test_result.configure(
+                    text=f"update failed: {e}", foreground=T.RED))
+                return
+            self.win.after(0, lambda: self.test_result.configure(
+                text=msg, foreground=T.GREEN))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _export(self):
         from ..engine.config import export_config

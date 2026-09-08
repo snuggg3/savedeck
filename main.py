@@ -71,6 +71,30 @@ def _make_tray(root: tk.Tk, config, engine, on_quit):
     return icon
 
 
+def _startup_update_check(engine):
+    """Best-effort update notice for packaged builds (never blocks startup)."""
+    if not getattr(sys, "frozen", False):
+        return
+    if engine.config.settings.get("check_updates", True) is False:
+        return
+
+    def worker():
+        import time
+        time.sleep(5)  # let the app settle first
+        from savedeck import notify, update
+        try:
+            current, latest, url = update.check()
+            if update.is_newer(latest, current) and url:
+                notify.notify(
+                    "SaveDeck - update available",
+                    f"Version v{latest} is out. Open Settings > "
+                    f"'Check for updates...' to install it.")
+        except Exception:
+            pass
+
+    threading.Thread(target=worker, daemon=True).start()
+
+
 def main():
     if not acquire():
         focus_existing()  # already running: just bring that window forward
@@ -87,6 +111,7 @@ def main():
     root = tk.Tk()
     root.title(APP_TITLE)
     root.geometry("1220x800")
+    root.minsize(900, 560)
     T.apply(root)
     T.center_on_screen(root, 1220, 800)
     app = SaveDeckApp(root, config, engine)
@@ -103,6 +128,7 @@ def main():
             pass
 
     state["tray"] = _make_tray(root, config, engine, on_quit=quit_app)
+    _startup_update_check(engine)
 
     def on_close():
         if state["tray"] is not None:

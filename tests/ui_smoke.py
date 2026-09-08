@@ -46,14 +46,25 @@ def settle():
         tiles = [w for w in app.inner.winfo_children()
                  if isinstance(w, tk.Frame)]
         result["tiles"] = len(tiles)
-        # exercise filtering
+        # exercise filtering (search is debounced - flush it explicitly)
         app.search_var.set("alpha")
+        app._search_apply()
         root.update_idletasks()
         filtered = len([w for w in app.inner.winfo_children()
                         if isinstance(w, tk.Frame)])
         result["filtered"] = filtered
         app.search_var.set("")
+        app._search_apply()
         root.update_idletasks()
+        # status-bar actions (tray-only features now on the UI) + sort modes
+        result["statusbar"] = (hasattr(app, "pause_btn")
+                               and app.sort_var.get() in ("A → Z", "Z → A",
+                                                          "Recently backed up")
+                               and len(app.inner.winfo_children()) >= 0)
+        try:
+            _ = app.backup_all, app.quit_app, app.toggle_pause_all
+        except AttributeError:
+            result["statusbar"] = False
         # hidden-games flow: hide a game, view it, unhide it
         app.toggle_hidden(app.lib["games"][0])
         root.update_idletasks()
@@ -141,7 +152,9 @@ print(f"  [{'PASS' if result.get('dlg_centered') else 'FAIL'}] "
       f"dialog centered over parent")
 print(f"  [{'PASS' if result.get('dlg_aligned') else 'FAIL'}] "
       f"game dialog labels aligned with widgets")
+print(f"  [{'PASS' if result.get('statusbar') else 'FAIL'}] "
+      f"status-bar actions + sort modes present")
 ok = (ok and result.get("main_centered") and result.get("dlg_centered")
-      and result.get("dlg_aligned"))
+      and result.get("dlg_aligned") and result.get("statusbar"))
 print("UI SMOKE TEST OK" if ok and result["tiles"] == 2 else "UI SMOKE TEST FAILED")
 sys.exit(0 if ok and result["tiles"] == 2 else 1)

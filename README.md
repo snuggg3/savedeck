@@ -69,7 +69,29 @@ keeps it protecting saves from the system tray.
   `○` (never / unprotected), `○ OFF` (protection disabled).
 - **Storage report**: versions, file counts and destination footprint per game.
 
-## Run
+## Install & self-update
+
+Build a Windows installer (requires [PyInstaller](https://pyinstaller.org)
+and [Inno Setup 6](https://jrsoftware.org/isinfo.php) with `iscc` on PATH):
+
+```bat
+pip install pyinstaller
+packaging\build.bat        :: -> dist\SaveDeck-Setup-1.0.0.exe
+```
+
+Attach the produced `SaveDeck-Setup-<version>.exe` (or a portable
+`SaveDeck-<version>-win64.zip`) to a GitHub release tagged `v<version>` —
+the app updates itself:
+
+- **⚙ SETTINGS → "Check for updates..."** compares against the latest release
+  (using the stored GitHub token, since the repo is private), downloads it,
+  and runs the new installer silently (`/VERYSILENT`, restarting the app).
+- Packaged builds also show a toast when a new release is detected a few
+  seconds after startup (disable with `"check_updates": false` in settings).
+- Portable `.zip` assets are supported too: the update is staged and swapped
+  by a small batch script after the running exe exits.
+
+## Run (from source)
 
 Requires Python 3.9+ (tested on 3.14).
 
@@ -108,6 +130,13 @@ new PC (tokens are not exported - they never leave the machine).
 
 ## Keyboard
 
-- `/` — focus search · `Esc` — clear search
+- `/` or `Ctrl+F` — focus search · `Esc` — clear search
 - `F5` — scan for installed games
 - Double-click a tile — run · right-click — full menu
+
+## Status bar
+
+Every tray action is also in the status bar: **⏸ PAUSE / ▶ RESUME**,
+**⇪ BACKUP ALL** (back up every protected game now) and **⏏ EXIT** (full
+exit — closing the window only hides to the tray). Sort modes: A → Z,
+Z → A, and *Recently backed up*.

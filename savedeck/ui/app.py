@@ -83,13 +83,15 @@ class SaveDeckApp:
         ttk.Label(header, text="▞ SAVEDECK", style="Logo.TLabel").pack(side="left")
 
         self.search_var = tk.StringVar()
-        self.search_var.trace_add("write", lambda *_: self.populate())
+        self._search_job = None
+        self.search_var.trace_add("write", self._on_search)  # debounced
         self.search = ttk.Entry(header, textvariable=self.search_var, width=24)
         self.search.pack(side="left", padx=(24, 6))
 
         self.sort_var = tk.StringVar(value="A → Z")
         sort = ttk.Combobox(header, textvariable=self.sort_var, state="readonly",
-                            width=7, values=("A → Z", "Z → A"))
+                            width=9,
+                            values=("A → Z", "Z → A", "Recently backed up"))
         sort.pack(side="left", padx=(16, 0))
         sort.bind("<<ComboboxSelected>>", lambda _e: self.populate())
 
@@ -100,12 +102,22 @@ class SaveDeckApp:
         self.hidden_btn.pack(side="left", padx=3)
         self.pw_btn = ttk.Button(btns, text="🔑 PASSWORD",
                                  command=self.set_password)
-        # password management lives inside the hidden view (Cartridge parity)
+        # password management lives inside the hidden view
         ttk.Button(btns, text="SCAN", command=self.scan).pack(side="left", padx=3)
         ttk.Button(btns, text="+ ADD", command=self.add_manual).pack(
             side="left", padx=3)
         ttk.Button(btns, text="⚙ SETTINGS", command=self.open_settings).pack(
             side="left", padx=3)
+
+    def _on_search(self, *_args):
+        """Debounce search repopulation (one rebuild per pause in typing)."""
+        if self._search_job is not None:
+            self.root.after_cancel(self._search_job)
+        self._search_job = self.root.after(180, self._search_apply)
+
+    def _search_apply(self):
+        self._search_job = None
+        self.populate()
 
     def _build_grid(self):
         mid = ttk.Frame(self.root)
@@ -127,17 +139,28 @@ class SaveDeckApp:
         self.canvas.bind_all("<Button-5>", self._on_wheel)
 
     def _build_status(self):
-        bar = ttk.Frame(self.root, style="Crust.TFrame", padding=(14, 6, 14, 6))
+        bar = ttk.Frame(self.root, style="Crust.TFrame", padding=(14, 4, 14, 4))
         bar.pack(fill="x", side="bottom")
         self.status_left = ttk.Label(bar, text="", style="Crust.TLabel")
         self.status_left.pack(side="left")
         self.status_msg = ttk.Label(bar, text="", style="CrustMuted.TLabel")
         self.status_msg.pack(side="left", padx=(20, 0))
-        ttk.Label(bar, text=f"SAVEDECK v{VERSION}",
-                  style="CrustMuted.TLabel").pack(side="right")
+        # every tray action is also available here
+        right = ttk.Frame(bar, style="Crust.TFrame")
+        right.pack(side="right")
+        ttk.Label(right, text=f"v{VERSION}",
+                  style="CrustMuted.TLabel").pack(side="left", padx=(8, 4))
+        self.pause_btn = ttk.Button(right, text="⏸ PAUSE", width=9,
+                                    command=self.toggle_pause_all)
+        self.pause_btn.pack(side="left", padx=2)
+        ttk.Button(right, text="⇪ BACKUP ALL", width=12,
+                   command=self.backup_all).pack(side="left", padx=2)
+        ttk.Button(right, text="⏏ EXIT", width=7,
+                   command=self.quit_app).pack(side="left", padx=2)
 
     def _bind_keys(self):
         self.root.bind("/", self._focus_search)
+        self.root.bind("<Control-f>", self._focus_search)
         self.root.bind("<Escape>", self._clear_search)
         self.root.bind("<F5>", lambda _e: self.scan())
 
@@ -150,6 +173,14 @@ class SaveDeckApp:
         self.canvas.focus_set()
 
     def _on_wheel(self, e):
+        # never scroll into blank space when the whole grid fits the view
+        region = self.canvas.cget("scrollregion").split()
+        if len(region) == 4:
+            try:
+                if int(region[3]) - int(region[1]) <= self.canvas.winfo_height():
+                    return
+            except (ValueError, tk.TclError):
+                pass
         delta = -1 if getattr(e, "delta", 120) > 0 or getattr(e, "num", 0) == 4 else 1
         self.canvas.yview_scroll(delta * 3, "units")
 
@@ -160,21 +191,36 @@ class SaveDeckApp:
             self.populate()
 
     # -- population ------------------------------------------------------------
+    def _backup_ts(self, entry: dict) -> str:
+        game = self._sp_game(entry)
+        return game.last_backup if game else ""
+
     def visible_games(self) -> list:
         query = self.search_var.get().lower().strip()
         games = [g for g in self.lib["games"]
                  if bool(g.get("hidden")) == self.showing_hidden]
         if query:
             games = [g for g in games if query in g.get("name", "").lower()]
-        reverse = self.sort_var.get() == "Z → A"
+        mode = self.sort_var.get()
+        if mode == "Recently backed up":
+            games.sort(key=self._backup_ts, reverse=True)
+            games.sort(key=lambda g: not g.get("favorite"))  # stable: favs first
+            return games
+        reverse = mode == "Z → A"
         return sorted(games, key=lambda g: (not g.get("favorite"),
                                             g.get("name", "").lower()),
                       reverse=reverse)
 
     def populate(self):
+        games = self.visible_games()
+        # skip the (relatively expensive) rebuild when nothing visible changed
+        sig = tuple((g.get("id"), g.get("favorite"), self._meta_line(g))
+                    for g in games)
+        if sig == getattr(self, "_last_sig", None) and self.inner.winfo_children():
+            return
+        self._last_sig = sig
         for child in self.inner.winfo_children():
             child.destroy()
-        games = self.visible_games()
         cols = self._cols or 4
         for i, entry in enumerate(games):
             self._make_tile(self.inner, entry).grid(
@@ -186,6 +232,8 @@ class SaveDeckApp:
                    else "no games - press SCAN or + ADD")
             ttk.Label(self.inner, text=msg, style="Faint.TLabel").grid(
                 row=0, column=0, pady=60)
+        # fresh content starts at the top - never show blank space above row 0
+        self.canvas.yview_moveto(0)
         self._refresh_status()
 
     def _sp_game(self, entry: dict):
@@ -215,7 +263,8 @@ class SaveDeckApp:
 
         for w in (tile, img):
             w.bind("<Double-Button-1>", lambda _e, en=entry: self.run_game(en))
-            w.bind("<Button-3>", lambda _e, en=entry, t=tile: self.tile_menu(en, t))
+            w.bind("<Button-3>",
+                   lambda e, en=entry, t=tile: self.tile_menu(en, t, e))
             w.bind("<Enter>", lambda _e, t=tile: t.configure(
                 highlightbackground=T.GREEN))
             w.bind("<Leave>", lambda _e, t=tile: t.configure(
@@ -263,7 +312,7 @@ class SaveDeckApp:
         if folder:
             os.startfile(folder)
 
-    def tile_menu(self, entry: dict, tile: tk.Frame):
+    def tile_menu(self, entry: dict, tile: tk.Frame, event=None):
         menu = tk.Menu(tile, tearoff=0, bg=T.PANEL, fg=T.TEXT,
                        activebackground=T.SURFACE, activeforeground=T.GREEN,
                        font=T.FONT_SMALL)
@@ -291,10 +340,47 @@ class SaveDeckApp:
         menu.add_separator()
         menu.add_command(label="Remove from library",
                          command=lambda: self.remove_game(entry))
-        menu.tk_popup(tile.winfo_rootx() + 20, tile.winfo_rooty() + 20)
+        # open at the cursor: a fixed tile offset makes the button release land
+        # on a random item and "click" it
+        if event is not None:
+            x, y = event.x_root, event.y_root
+        else:
+            x, y = tile.winfo_rootx() + 20, tile.winfo_rooty() + 20
+        try:
+            menu.tk_popup(x, y + 1)
+        finally:
+            menu.grab_release()
 
     # -- actions --------------------------------------------------------------
+    def backup_all(self):
+        n = 0
+        for g in self.config.games:
+            if g.enabled and g.paths:
+                self.engine.backup_now(g.id)
+                n += 1
+        self._set_status_msg(f"backing up {n} protected game(s)..."
+                             if n else "no protected games to back up")
+
+    def toggle_pause_all(self):
+        if self.engine.is_paused():
+            self.engine.resume()
+            self._set_status_msg("backups resumed")
+        else:
+            self.engine.pause()
+            self._set_status_msg("backups paused")
+        self._refresh_status()
+
+    def quit_app(self):
+        """Full exit (window close only hides to the tray)."""
+        self.engine.stop()
+        self.root.destroy()
+
     def run_game(self, entry: dict):
+        if self.config.settings.get("confirm_launch") and \
+                not messagebox.askyesno(
+                    "SaveDeck", f"Launch \"{entry.get('name')}\"?",
+                    parent=self.root):
+            return
         try:
             launch.launch(entry)
         except Exception as e:
@@ -443,10 +529,13 @@ class SaveDeckApp:
     def _refresh_status(self):
         games = self.lib["games"]
         protected = sum(1 for e in games if self._sp_game(e))
-        state = "PAUSED" if self.engine.is_paused() else "PROTECTING"
+        paused = self.engine.is_paused()
+        state = "PAUSED" if paused else "PROTECTING"
         self.status_left.configure(
             text=f"{len(games)} GAMES · {state} {protected} · "
                  f"last scan {time_ago(self.lib.get('lastScan'))}")
+        if hasattr(self, "pause_btn"):
+            self.pause_btn.configure(text="▶ RESUME" if paused else "⏸ PAUSE")
 
     def _refresh_status_loop(self):
         self._refresh_status()
