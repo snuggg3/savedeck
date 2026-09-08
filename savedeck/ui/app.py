@@ -139,24 +139,26 @@ class SaveDeckApp:
         self.canvas.bind_all("<Button-5>", self._on_wheel)
 
     def _build_status(self):
-        bar = ttk.Frame(self.root, style="Crust.TFrame", padding=(14, 4, 14, 4))
+        bar = ttk.Frame(self.root, style="Crust.TFrame", padding=(10, 4, 10, 4))
         bar.pack(fill="x", side="bottom")
-        self.status_left = ttk.Label(bar, text="", style="Crust.TLabel")
-        self.status_left.pack(side="left")
-        self.status_msg = ttk.Label(bar, text="", style="CrustMuted.TLabel")
-        self.status_msg.pack(side="left", padx=(20, 0))
-        # every tray action is also available here
+        # pack the right cluster FIRST so it can never be squeezed off-screen
         right = ttk.Frame(bar, style="Crust.TFrame")
         right.pack(side="right")
         ttk.Label(right, text=f"v{VERSION}",
-                  style="CrustMuted.TLabel").pack(side="left", padx=(8, 4))
-        self.pause_btn = ttk.Button(right, text="⏸ PAUSE", width=9,
+                  style="CrustMuted.TLabel").pack(side="left", padx=(6, 2))
+        self.pause_btn = ttk.Button(right, text="PAUSE", width=7,
                                     command=self.toggle_pause_all)
         self.pause_btn.pack(side="left", padx=2)
-        ttk.Button(right, text="⇪ BACKUP ALL", width=12,
+        ttk.Button(right, text="BACKUP ALL", width=11,
                    command=self.backup_all).pack(side="left", padx=2)
-        ttk.Button(right, text="⏏ EXIT", width=7,
+        ttk.Button(right, text="EXIT", width=6,
                    command=self.quit_app).pack(side="left", padx=2)
+        self.status_left = ttk.Label(bar, text="", style="Crust.TLabel")
+        self.status_left.pack(side="left")
+        self.status_msg = ttk.Label(bar, text="", style="CrustMuted.TLabel",
+                                    anchor="w")
+        self.status_msg.pack(side="left", fill="x", expand=True,
+                             padx=(16, 0))
 
     def _bind_keys(self):
         self.root.bind("/", self._focus_search)
@@ -535,7 +537,7 @@ class SaveDeckApp:
             text=f"{len(games)} GAMES · {state} {protected} · "
                  f"last scan {time_ago(self.lib.get('lastScan'))}")
         if hasattr(self, "pause_btn"):
-            self.pause_btn.configure(text="▶ RESUME" if paused else "⏸ PAUSE")
+            self.pause_btn.configure(text="RESUME" if paused else "PAUSE")
 
     def _refresh_status_loop(self):
         self._refresh_status()

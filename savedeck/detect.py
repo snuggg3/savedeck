@@ -176,27 +176,37 @@ def detect_epic_games() -> list:
                                  "Epic", "EpicGamesLauncher", "Data", "Manifests")
     if not os.path.isdir(manifests_dir):
         return []
-    games = []
-    for fn in os.listdir(manifests_dir):
-        if not fn.endswith(".item"):
-            continue
-        try:
-            with open(os.path.join(manifests_dir, fn), encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            continue
-        name = (data.get("DisplayName") or "").strip()
-        if not name or data.get("bIsIncompleteInstall"):
-            continue
-        launch = (f"com.epicgames.launcher://apps/{data.get('AppName')}"
-                  "?action=launch&silent=true") if data.get("AppName") else None
-        games.append({
-            "name": name,
-            "source": "epic",
-            "installPath": data.get("InstallLocation") or None,
-            "launchTarget": launch,
-            "thumb": None,  # filled by fetch_epic_thumbnail during scans
-        })
+    games, seen = [], set()
+    # recurse: the launcher keeps manifests both in Manifests\ and in
+    # Manifests\Pending\ subfolders (Pending is common on recent installs)
+    for dirpath, _dirs, files in os.walk(manifests_dir):
+        for fn in files:
+            if not fn.endswith(".item"):
+                continue
+            try:
+                with open(os.path.join(dirpath, fn), encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                continue
+            if data.get("bIsApplication") is False:
+                continue  # DLC / content packs, not launchable games
+            name = (data.get("DisplayName") or data.get("AppName") or "").strip()
+            if not name or name.lower() in seen:
+                continue
+            install_loc = data.get("InstallLocation") or ""
+            if data.get("bIsIncompleteInstall") and \
+                    not os.path.isdir(install_loc):
+                continue  # genuinely partial download, nothing playable
+            seen.add(name.lower())
+            launch = (f"com.epicgames.launcher://apps/{data.get('AppName')}"
+                      "?action=launch&silent=true") if data.get("AppName") else None
+            games.append({
+                "name": name,
+                "source": "epic",
+                "installPath": install_loc or None,
+                "launchTarget": launch,
+                "thumb": None,  # filled by fetch_epic_thumbnail during scans
+            })
     return games
 
 
