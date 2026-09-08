@@ -48,8 +48,11 @@ def check():
                            f"{r.json().get('message', r.text[:120])}")
     data = r.json()
     tag = (data.get("tag_name") or "").lstrip("vV")
-    assets = [(a["name"], a["browser_download_url"])
-              for a in (data.get("assets") or [])]
+    assets = [(a["name"], a["url"]) for a in (data.get("assets") or [])]
+    # NOTE: use the API asset url, not browser_download_url - the latter
+    # returns 404 for private repos even with a token (no Bearer auth on
+    # github.com download links). The API url serves the file when fetched
+    # with Accept: application/octet-stream.
     url = None
     for name, u in assets:  # prefer the Inno Setup installer
         low = name.lower()
@@ -79,7 +82,10 @@ def is_newer(latest: str, current: str = VERSION) -> bool:
 
 
 def _download(url: str, dest: str, on_progress=None) -> None:
-    with requests.get(url, headers=_headers(), stream=True, timeout=30) as r:
+    headers = _headers()
+    headers["Accept"] = "application/octet-stream"  # asset API endpoint
+    with requests.get(url, headers=headers, stream=True,
+                      timeout=(15, 60)) as r:
         r.raise_for_status()
         total = int(r.headers.get("content-length") or 0)
         done = 0

@@ -480,50 +480,63 @@ class SettingsDialog:
         self.app.config.settings["confirm_launch"] = self.confirm_var.get()
         self.app.config.save()
 
+    # -- self-update: worker threads only write state; a main-thread poll
+    #    loop renders it (widgets must never be touched off-thread) ----------
+    def _set_upd(self, text: str, color: str):
+        self._upd_state = (text, color)
+
+    def _poll_upd(self):
+        if not self.win.winfo_exists():
+            return
+        pending = getattr(self, "_upd_pending", None)
+        if pending is not None:
+            self._upd_pending = None
+            self._offer_update(*pending)
+        state = getattr(self, "_upd_state", None)
+        if state:
+            self.test_result.configure(text=state[0], foreground=state[1])
+        self.win.after(250, self._poll_upd)
+
     def _check_updates(self):
-        self.test_result.configure(text="checking for updates...",
-                                   foreground=T.MUTED)
+        self._upd_state = ("checking for updates...", T.MUTED)
+        self._upd_pending = None
+        self._poll_upd()
 
         def worker():
             from savedeck import update
             try:
                 current, latest, url = update.check()
             except Exception as e:
-                self.win.after(0, lambda: self.test_result.configure(
-                    text=f"update check failed: {e}", foreground=T.RED))
+                self._upd_state = (f"update check failed: {e}", T.RED)
                 return
             if not update.is_newer(latest, current):
-                self.win.after(0, lambda: self.test_result.configure(
-                    text=f"up to date (v{current})", foreground=T.GREEN))
+                self._upd_state = (f"up to date (v{current})", T.GREEN)
                 return
-            self.win.after(0, lambda: self._offer_update(latest, url))
+            self._upd_state = (f"update available: v{latest}", T.YELLOW)
+            self._upd_pending = (latest, url)
 
         threading.Thread(target=worker, daemon=True).start()
 
     def _offer_update(self, latest: str, url: str):
-        self.test_result.configure(text=f"update available: v{latest}",
-                                   foreground=T.YELLOW)
+        """Runs on the main thread (scheduled via _poll_upd)."""
         if not messagebox.askyesno(
                 "SaveDeck", f"Version v{latest} is available.\n"
                 "Download and install it now?", parent=self.win):
             return
-        self.test_result.configure(text="downloading update...",
-                                   foreground=T.MUTED)
+        self._upd_state = ("downloading update... 0%", T.MUTED)
 
         def worker():
             from savedeck import update
             try:
                 msg = update.apply_update(
-                    url, on_progress=lambda done, total: self.win.after(
-                        0, lambda: self.test_result.configure(
-                            text=f"downloading update... "
-                                 f"{done * 100 // max(total, 1)}%")))
+                    url,
+                    on_progress=lambda d, t: self._set_upd(
+                        f"downloading update... {d * 100 // max(t, 1)}%",
+                        T.MUTED))
             except Exception as e:
-                self.win.after(0, lambda: self.test_result.configure(
-                    text=f"update failed: {e}", foreground=T.RED))
+                self._upd_state = (f"update failed: {e}", T.RED)
                 return
-            self.win.after(0, lambda: self.test_result.configure(
-                text=msg, foreground=T.GREEN))
+            self._upd_state = (msg, T.GREEN)
 
         threading.Thread(target=worker, daemon=True).start()
 
