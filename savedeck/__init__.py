@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 
 APP_NAME = "SaveDeck"
-VERSION = "1.0.4"
+VERSION = "1.0.5"
 
 
 def home_dir() -> str:
