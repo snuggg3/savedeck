@@ -1,4 +1,4 @@
-; Inno Setup script for SaveDeck.
+﻿; Inno Setup script for SaveDeck.
 ; Build pipeline:  packaging\build.bat  (PyInstaller -> dist\SaveDeck\, then ISCC)
 #define MyAppName "SaveDeck"
 #define MyAppVersion "1.0.0"

@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+build/
+dist/
+*.spec
+data/
+
+# batch files must keep CRLF line endings or cmd.exe breaks (labels not found)
+*.bat text eol=crlf
+*.iss text eol=crlf
