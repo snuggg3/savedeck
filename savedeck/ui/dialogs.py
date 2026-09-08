@@ -488,6 +488,12 @@ class SettingsDialog:
     def _poll_upd(self):
         if not self.win.winfo_exists():
             return
+        import time
+        quit_at = getattr(self, "_quit_at", None)
+        if quit_at and time.time() >= quit_at:
+            self._quit_at = None
+            self.app.quit_app()  # hand over to the installer
+            return
         pending = getattr(self, "_upd_pending", None)
         if pending is not None:
             self._upd_pending = None
@@ -537,6 +543,11 @@ class SettingsDialog:
                 self._upd_state = (f"update failed: {e}", T.RED)
                 return
             self._upd_state = (msg, T.GREEN)
+            if msg.startswith("installer launched"):
+                # free the locked exe files so Setup can replace them; the
+                # restart batch starts the new version after Setup finishes
+                import time
+                self._quit_at = time.time() + 2.0
 
         threading.Thread(target=worker, daemon=True).start()
 

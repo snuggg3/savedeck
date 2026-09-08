@@ -108,10 +108,26 @@ def apply_update(url: str, on_progress=None) -> str:
     _download(url, local, on_progress)
 
     if local.lower().endswith(".exe"):
-        subprocess.Popen([local, "/VERYSILENT", "/SUPPRESSMSGBOXES",
-                          "/NORESTART", "/CLOSEAPPLICATIONS",
-                          "/RESTARTAPPLICATIONS"])
-        return "installer launched - SaveDeck will restart into the new version"
+        proc = subprocess.Popen([local, "/VERYSILENT", "/SUPPRESSMSGBOXES",
+                                 "/NORESTART", "/CLOSEAPPLICATIONS",
+                                 "/FORCECLOSEAPPLICATIONS"])
+        # The running exe locks its own files, so SaveDeck must exit and
+        # something must start the new build after Setup finishes: a small
+        # batch waits for the installer process, then relaunches the app.
+        app_dir = os.path.dirname(sys.executable)
+        exe = os.path.basename(sys.executable)
+        bat = os.path.join(tmp, "restart_after_install.bat")
+        with open(bat, "w", encoding="utf-8") as f:
+            f.write("@echo off\r\n"
+                    ":wait\r\n"
+                    f"tasklist /FI \"PID eq {proc.pid}\" | find "
+                    f"\"{proc.pid}\" >nul && (timeout /t 1 /nobreak >nul "
+                    "& goto wait)\r\n"
+                    f"start \"\" \"{os.path.join(app_dir, exe)}\"\r\n"
+                    "del \"%~f0\"\r\n")
+        os.startfile(bat)
+        return ("installer launched - SaveDeck will exit and the new "
+                "version will start automatically")
 
     # portable zip: stage extracted files and swap them after we exit
     extract = os.path.join(tmp, "new")
