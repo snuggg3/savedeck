@@ -48,6 +48,46 @@ def focus_existing() -> bool:
         SW_RESTORE = 9
         user32.ShowWindow(hwnd, SW_RESTORE)
         user32.SetForegroundWindow(hwnd)
+        hide_helper_windows()
         return True
     except Exception:
         return False
+
+
+# Tk keeps hidden helper top-level windows around for menus and ttk
+# dropdowns. Relaunching the exe (app-activation paths, e.g. a PowerToys
+# keybind) can make Windows show them alongside the main window; they must
+# never be visible, so we hide them again whenever SaveDeck takes focus.
+HELPER_WINDOW_TITLES = ("TtkMonitorWindow", "EmbeddedMenuWindow",
+                        "MenuWindow", "TtkMenuWindow")
+
+
+def hide_helper_windows():
+    """Hide stray visible Tk helper windows (menus / ttk popdowns)."""
+    if sys.platform != "win32":
+        return
+    try:
+        from ctypes import wintypes
+
+        user32 = ctypes.windll.user32
+        titles = {t.lower() for t in HELPER_WINDOW_TITLES}
+        strays = []
+        proto = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND,
+                                   wintypes.LPARAM)
+
+        def on_window(hwnd, _lparam):
+            if user32.IsWindowVisible(hwnd):
+                n = user32.GetWindowTextLengthW(hwnd)
+                if n:
+                    buf = ctypes.create_unicode_buffer(n + 1)
+                    user32.GetWindowTextW(hwnd, buf, n + 1)
+                    if buf.value.strip().lower() in titles:
+                        strays.append(hwnd)
+            return True
+
+        enum_cb = proto(on_window)
+        user32.EnumWindows(enum_cb, 0)
+        for hwnd in strays:
+            user32.ShowWindow(hwnd, 0)  # SW_HIDE
+    except Exception:
+        pass  # cosmetic cleanup - must never break launching/focusing

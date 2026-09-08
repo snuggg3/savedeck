@@ -38,9 +38,11 @@ def _make_tray(root: tk.Tk, config, engine, on_quit):
 
     def _open(icon=None, item=None):
         def show():
+            from savedeck.engine.single_instance import hide_helper_windows
             root.deiconify()
             root.lift()
             root.focus_force()
+            hide_helper_windows()
         root.after(0, show)
 
     def _backup_all(icon=None, item=None):

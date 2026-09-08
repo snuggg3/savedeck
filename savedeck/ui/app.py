@@ -539,6 +539,10 @@ class SaveDeckApp:
 
     def _refresh_status_loop(self):
         self._refresh_status()
+        # Tk helper windows (menus/ttk popdowns) must stay hidden; external
+        # app-activation (keybind relaunches) can make them visible
+        from savedeck.engine.single_instance import hide_helper_windows
+        hide_helper_windows()
         self.root.after(15000, self._refresh_status_loop)
 
     def _poll(self):
