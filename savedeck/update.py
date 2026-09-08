@@ -39,6 +39,10 @@ def check():
     Raises RuntimeError on network/API failure.
     """
     r = requests.get(API, headers=_headers(), timeout=10)
+    if r.status_code == 404:
+        raise RuntimeError("no release published yet - a GitHub release "
+                           "tagged v<version> with a SaveDeck-Setup asset "
+                           "is needed")
     if r.status_code != 200:
         raise RuntimeError(f"GitHub returned {r.status_code}: "
                            f"{r.json().get('message', r.text[:120])}")
