@@ -511,19 +511,23 @@ class SettingsDialog:
         def worker():
             from savedeck import update
             try:
-                current, latest, url = update.check()
+                current, latest, url, name = update.check()
             except Exception as e:
                 self._upd_state = (f"update check failed: {e}", T.RED)
                 return
             if not update.is_newer(latest, current):
                 self._upd_state = (f"up to date (v{current})", T.GREEN)
                 return
+            if not url:
+                self._upd_state = ("update available, but the release has no "
+                                   "installable asset", T.RED)
+                return
             self._upd_state = (f"update available: v{latest}", T.YELLOW)
-            self._upd_pending = (latest, url)
+            self._upd_pending = (latest, url, name)
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _offer_update(self, latest: str, url: str):
+    def _offer_update(self, latest: str, url: str, name: str):
         """Runs on the main thread (scheduled via _poll_upd)."""
         if not messagebox.askyesno(
                 "SaveDeck", f"Version v{latest} is available.\n"
@@ -535,7 +539,7 @@ class SettingsDialog:
             from savedeck import update
             try:
                 msg = update.apply_update(
-                    url,
+                    url, name,
                     on_progress=lambda d, t: self._set_upd(
                         f"downloading update... {d * 100 // max(t, 1)}%",
                         T.MUTED))

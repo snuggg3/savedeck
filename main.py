@@ -85,7 +85,7 @@ def _startup_update_check(engine):
         time.sleep(5)  # let the app settle first
         from savedeck import notify, update
         try:
-            current, latest, url = update.check()
+            current, latest, url, name = update.check()
             if update.is_newer(latest, current) and url:
                 notify.notify(
                     "SaveDeck - update available",

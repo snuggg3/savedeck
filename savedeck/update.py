@@ -52,19 +52,25 @@ def check():
     # NOTE: use the API asset url, not browser_download_url - the latter
     # returns 404 for private repos even with a token (no Bearer auth on
     # github.com download links). The API url serves the file when fetched
-    # with Accept: application/octet-stream.
-    url = None
-    for name, u in assets:  # prefer the Inno Setup installer
-        low = name.lower()
+    # with Accept: application/octet-stream. The asset *name* is returned
+    # too, because API urls carry no file extension.
+    url = name = None
+    for aname, u in assets:  # prefer the Inno Setup installer
+        low = aname.lower()
         if low.endswith(".exe") and "setup" in low:
-            url = u
+            url, name = u, aname
             break
     if url is None:
-        for name, u in assets:
-            if name.lower().endswith(".zip"):
-                url = u
+        for aname, u in assets:
+            if aname.lower().endswith(".exe"):
+                url, name = u, aname
                 break
-    return VERSION, tag, url
+    if url is None:
+        for aname, u in assets:
+            if aname.lower().endswith(".zip"):
+                url, name = u, aname
+                break
+    return VERSION, tag, url, name
 
 
 def is_newer(latest: str, current: str = VERSION) -> bool:
@@ -97,14 +103,16 @@ def _download(url: str, dest: str, on_progress=None) -> None:
                     on_progress(done, total)
 
 
-def apply_update(url: str, on_progress=None) -> str:
+def apply_update(url: str, name: str, on_progress=None) -> str:
     """Download the update and hand over to the new installer (or staged
     replace). Returns a human-readable status message."""
     if not getattr(sys, "frozen", False):
         return ("updates apply to the packaged app - running from source: "
                 "git pull instead")
     tmp = tempfile.mkdtemp(prefix="savedeck-update-")
-    local = os.path.join(tmp, url.split("/")[-1].split("?")[0])
+    # name comes from the release asset and carries the proper extension
+    # (API asset urls are bare ids like .../releases/assets/54973970)
+    local = os.path.join(tmp, name or "SaveDeck-Setup-Update.exe")
     _download(url, local, on_progress)
 
     if local.lower().endswith(".exe"):
